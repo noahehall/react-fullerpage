@@ -4,7 +4,7 @@ const voidFn = (el?) => void 0;
 const getIndex = (el: any) => 0;
 const observeFn = (el) => el;
 
-export default createContext({
+export const FullpageContext =  createContext({
   back: voidFn,
   fullpageRef: null,
   getIndex,

@@ -1,6 +1,6 @@
-import { useContext, useMemo, type CSSProperties } from "react";
+import { useContext, useMemo, type CSSProperties, type FC } from "react";
 
-import FullpageContext from "./FullpageContext";
+import {FullpageContext} from "./FullpageContext";
 
 export interface FullpageNavigationInterface {
   style?: CSSProperties;
@@ -8,11 +8,11 @@ export interface FullpageNavigationInterface {
   reverse?: boolean;
 }
 // TODO: do navigation
-export default function FullpageNavigation({
+export const FullpageNavigation: FC<FullpageNavigationInterface> = ({
   style = {},
   itemStyle = {},
   reverse = false,
-}: FullpageNavigationInterface): JSX.Element {
+} => {
   const useStyle = useMemo(
     () => ({
       position: "fixed" as const,

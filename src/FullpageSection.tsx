@@ -5,9 +5,10 @@ import {
   useEffect,
   type CSSProperties,
   type ReactNode,
+  type FC,
 } from "react";
 
-import FullpageContext from "./FullpageContext";
+import {FullpageContext} from "./FullpageContext";
 
 export const FullpageSectionContext = createContext(null);
 
@@ -20,7 +21,7 @@ export interface FullpageSectionInterface {
   onShow?: Function;
   onHide?: Function;
 }
-export default function FullpageSection({
+export const FullpageSection: FC<FullpageSectionInterface> = ({
   children,
   //
   className = "",
@@ -28,7 +29,7 @@ export default function FullpageSection({
   onHide,
   onShow,
   style = {},
-}: FullpageSectionInterface): JSX.Element {
+}) => {
   const { subscribe, unsubscribe, getIndex } = useContext(FullpageContext);
   const sectionRef = useRef(null);
 

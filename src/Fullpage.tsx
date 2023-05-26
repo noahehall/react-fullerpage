@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 
-import FullpageContext from "./FullpageContext";
+import {FullpageContext} from "./FullpageContext";
 
 export interface FullpageInterface {
   children: ReactNode;
@@ -75,19 +75,22 @@ export default function Fullpage({
   const fullpageRef = useRef<HTMLElement>(null);
 
   const getIndex = (slide) => {
+    // if (slide.current) console.info('\n\n\n in getIndex', slide, slides.indexOf(slide))
     return slides.indexOf(slide);
   };
 
   const subscribe = (slide) => {
     // add new slide (push)
-    // sort slide for top to bottom
-    setSlides(
-      [...slides, slide].sort((a, b) => {
-        const aTop = a.el.current.offsetTop;
-        const bTop = b.el.current.offsetTop;
+    // sort slide from top to bottom
+    setSlides((prevSlides) => {
+      const newSlides = [...prevSlides, slide].sort(({current: a }, {current: b}) => {
+        const aTop = a.offsetTop;
+        const bTop = b.offsetTop;
         return aTop - bTop;
       })
-    );
+      // console.info('\n\n\n adding slide', prevSlides, newSlides)
+      return newSlides
+    });
     ticking.current = false;
     handleResize();
 
@@ -95,7 +98,12 @@ export default function Fullpage({
   };
 
   const unsubscribe = (slide) => {
-    setSlides(slides.filter((s) => s.el !== slide.el));
+
+    setSlides(prevSlides => {
+      const newSlides = prevSlides.filter((s) => s !== slide)
+      // console.info('\n\n\n removing slide', slide, prevSlides, newSlides)
+      return newSlides
+    })
     handleResize();
     handleScroll();
 
@@ -103,8 +111,9 @@ export default function Fullpage({
   };
 
   const handleScroll = () => {
-    const { resetScroll, translateY, offsetHeight } = pageState;
+    const { resetScroll, translateY, offsetHeight, viewportHeight } = pageState;
 
+    console.info('\n\n\n handle scroll', slide, ticking, pageState)
     if (pageState.lockScroll) {
       // if > top and bottom < fix scroll
       window.scrollTo(0, translateY * -1);
@@ -112,12 +121,11 @@ export default function Fullpage({
       return false;
     }
 
-    if (slide)
+    if (slide?.current) {
       if (
-        slide &&
-        window.pageYOffset >= slide.el.current.offsetTop &&
+        window.pageYOffset >= slide.current.offsetTop &&
         (window.pageYOffset <=
-          slide.el.current.offsetTop + offsetHeight - this.viewportHeight ||
+          slide.current.offsetTop + offsetHeight - viewportHeight ||
           slide === slides[slides.length - 1])
       ) {
         setPageState({
@@ -127,7 +135,7 @@ export default function Fullpage({
         });
         return true;
       }
-
+    }
     if (!ticking.current) {
       window.requestAnimationFrame(() => {
         if (resetScroll) {
@@ -143,11 +151,11 @@ export default function Fullpage({
           transitionTiming,
         });
 
-        ticking.current = false;
+        // ticking.current = false;
 
         goto(
           slides.find((slide) => {
-            const el = slide.el.current;
+            const el = slide.current;
 
             return pageYOffset < el.offsetTop + el.offsetHeight * 0.5;
           })
@@ -160,15 +168,16 @@ export default function Fullpage({
   };
 
   const handleResize = () => {
+    console.info('\n\n\n handle resize', ticking, fullpageRef, driverRef)
     if (!ticking.current || !fullpageRef.current || !driverRef.current) return;
 
     window.requestAnimationFrame(() => {
       const fullpageHeight = fullpageRef.current!.clientHeight;
+      ticking.current = false
       // update count
       setPageState({
         ...pageState,
         fullpageHeight,
-        ticking: false,
         viewportHeight: Math.max(
           document.documentElement.clientHeight,
           window.innerHeight || 0
@@ -182,37 +191,33 @@ export default function Fullpage({
   };
 
   const handleKeys = (event: KeyboardEvent) => {
+    console.info('\n\n\n handle keys', slides);
+
     if (!keyboardShortcut) return true;
 
     const eventKey = event.code || event.keyCode;
 
-    if (
-      eventKey === 33 || // pageUp:    33,
-      eventKey === 37 || // left:      37,
-      eventKey === 38 // up:        38,
-    ) {
-      event.preventDefault();
-      return event.shiftKey ? first() : back();
-    }
-    if (
-      eventKey === 34 || // pageDown:  34,
-      eventKey === 39 || // right:     39,
-      eventKey === 40 // down:      40,
-    ) {
-      event.preventDefault();
-      return event.shiftKey ? last() : next();
-    }
-    if (
-      eventKey === 35 // end:       35,
-    ) {
-      event.preventDefault();
-      return last();
-    }
-    if (
-      eventKey === 36 // home:      36,
-    ) {
-      event.preventDefault();
-      return first();
+    switch (event.code) {
+      case 'PageDown':
+      case 'ArrowRight':
+      case 'ArrowDown': {
+        event.preventDefault();
+        return event.shiftKey ? last() : next();
+      }
+      case 'PageUp':
+      case 'ArrowLeft':
+      case 'ArrowUp': {
+        event.preventDefault();
+        return event.shiftKey ? first() : back();
+      }
+      case 'End': {
+        event.preventDefault();
+        return last();
+      }
+      case 'Home': {
+        event.preventDefault();
+        return first();
+      }
     }
 
     return true;
@@ -226,10 +231,16 @@ export default function Fullpage({
   const goto = (newSlide, resetScroll = false) => {
     const { transitionTiming, fullpageHeight, viewportHeight } = pageState;
 
-    if (slide !== newSlide && newSlide) {
+    console.info('\n\n\n in goto', slide, newSlide, slide != newSlide);
+
+    // TODO(noah): this is always false
+    // ^ because after move it always resets to slide 0
+    // ^ i.e. only the first move works, then it gets stuck on 0 != 0
+    if (slide != newSlide) {
+      console.info('\n\n\n in first check', slide, newSlide)
       const translateY = Math.max(
         (fullpageHeight - viewportHeight) * -1,
-        newSlide.el.current.offsetTop * -1
+        newSlide.current.offsetTop * -1
       );
 
       if (onHide && typeof onHide === "function") {
@@ -241,7 +252,7 @@ export default function Fullpage({
         slideIndex: getIndex(newSlide),
         translateY,
         lockScroll: true,
-        offsetHeight: newSlide.el.current.offsetHeight,
+        offsetHeight: newSlide.current.offsetHeight,
         resetScroll,
       };
       setPageState(newPageState);
@@ -264,35 +275,52 @@ export default function Fullpage({
   };
 
   const back = () => {
-    const index = Math.max(0, pageState.slideIndex - 1);
+    const index = pageState.slideIndex >= slides.length - 1
+      ? 0
+      : pageState.slideIndex + 1
+
+    // console.info('\n\n\n in back', index, slides[index])
     goto(slides[index], true);
   };
 
   const next = () => {
-    const index = Math.min(slides.length - 1, pageState.slideIndex + 1);
-    goto(slides[index], true);
+    const index = pageState.slideIndex < (slides.length - 1)
+      ? pageState.slideIndex + 1
+      : 0;
+
+    console.info('\n\n\n in next', pageState.slideIndex, index, slides[pageState.slideIndex], slides[index])
+    if (slides[index]) goto(slides[index], true);
+    else console.error('\n\n\n cant go to slide', index, slides)
   };
 
   const first = () => {
+    // console.info('\n\n\n in first', slides[0])
     goto(slides[0], true);
   };
 
   const last = () => {
+    // console.info('\n\n\n in last', slides[slides.length -1])
     goto(slides[slides.length - 1], true);
   };
 
   useEffect(() => {
-    handleResize();
-    if (slides.length) setSlide(slides[0]);
-    if (typeof window !== "undefined") {
-      window.addEventListener("scroll", handleScroll);
-      window.addEventListener("resize", handleResize);
-    }
-    if (typeof document !== "undefined") {
-      document.addEventListener("keydown", handleKeys);
+    let listenersAdded = false;
+
+    if (!listenersAdded) {
+      console.info('\n\n\n wtf adding listeners again')
+      listenersAdded = true;
+      // handleResize()
+      if (typeof window !== "undefined") {
+        window.addEventListener("scroll", handleScroll);
+        window.addEventListener("resize", handleResize);
+      }
+      if (typeof document !== "undefined") {
+        document.addEventListener("keydown", handleKeys);
+      }
     }
 
     return () => {
+      console.info('\n\n\n removing listeners')
       // set body height == to 'auto'
       if (typeof window !== "undefined") {
         window.removeEventListener("scroll", handleScroll);
@@ -301,11 +329,15 @@ export default function Fullpage({
       if (typeof document !== "undefined") {
         document.removeEventListener("keydown", handleKeys);
       }
+
+      listenersAdded = false;
     };
-  }, []);
+  });
 
   const { translateY, pageYOffset, offsetHeight, slideIndex, resetScroll } =
     pageState;
+
+  console.info('\n\n\n wtf fullpage', {slides, slide, pageState})
 
   // TODO(noah): update the naming convention of components
   // ^this FUllpage component isnt the fullpage component
@@ -331,7 +363,7 @@ export default function Fullpage({
         warperRef,
       }}
     >
-      <div name="Driver" style={useStyle} ref={driverRef}>
+      <div style={useStyle} ref={driverRef}>
         {children}
       </div>
     </FullpageContext.Provider>
