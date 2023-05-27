@@ -11,7 +11,7 @@ import {
   type FC,
 } from "react";
 
-import {FPContext} from "./FPContext";
+import { FPContext } from "./FPContext";
 
 export interface FPContainerInterface {
   children: ReactNode;
@@ -19,13 +19,18 @@ export interface FPContainerInterface {
   className?: string;
   style?: CSSProperties;
 }
-export const FullpageSection: FC<FPContainerInterface> = ({
+export const FPContainer: FC<FPContainerInterface> = ({
   children,
   className = "",
   style = {},
 }) => {
-  const { pageStyle, FPContainerOuterRef, transitionTiming, translateY, FPContainerInnerRef } =
-    useContext(FPContext);
+  const {
+    pageStyle,
+    FPContainerOuterRef,
+    transitionTiming,
+    translateY,
+    FPContainerInnerRef,
+  } = useContext(FPContext);
 
   const useStyle = useMemo(
     () => ({
@@ -52,4 +57,4 @@ export const FullpageSection: FC<FPContainerInterface> = ({
       </div>
     </div>
   );
-}
+};

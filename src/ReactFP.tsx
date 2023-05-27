@@ -6,9 +6,10 @@ import {
   type CSSProperties,
   type KeyboardEvent,
   type ReactNode,
+  type FC,
 } from "react";
 
-import {FPContext} from "./FPContext";
+import { FPContext } from "./FPContext";
 
 export interface ReactFPInterface {
   children: ReactNode;
@@ -22,7 +23,7 @@ export interface ReactFPInterface {
   pageStyle?: CSSProperties;
   transitionTiming: number;
 }
-export default function ReactFP({
+export const ReactFP: FC<ReactFPInterface> = ({
   children,
   //
   className = "",
@@ -33,7 +34,7 @@ export default function ReactFP({
   wrapperStyle = {},
   pageStyle = {},
   transitionTiming = 700,
-}: ReactFPInterface): JSX.Element {
+}) => {
   const ticking = useRef(false);
 
   const useStyle = useMemo(
@@ -83,13 +84,15 @@ export default function ReactFP({
     // add new slide (push)
     // sort slide from top to bottom
     setSlides((prevSlides) => {
-      const newSlides = [...prevSlides, slide].sort(({current: a }, {current: b}) => {
-        const aTop = a.offsetTop;
-        const bTop = b.offsetTop;
-        return aTop - bTop;
-      })
+      const newSlides = [...prevSlides, slide].sort(
+        ({ current: a }, { current: b }) => {
+          const aTop = a.offsetTop;
+          const bTop = b.offsetTop;
+          return aTop - bTop;
+        }
+      );
       // console.info('\n\n\n adding slide', prevSlides, newSlides)
-      return newSlides
+      return newSlides;
     });
     ticking.current = false;
     handleResize();
@@ -98,12 +101,11 @@ export default function ReactFP({
   };
 
   const unsubscribe = (slide) => {
-
-    setSlides(prevSlides => {
-      const newSlides = prevSlides.filter((s) => s !== slide)
+    setSlides((prevSlides) => {
+      const newSlides = prevSlides.filter((s) => s !== slide);
       // console.info('\n\n\n removing slide', slide, prevSlides, newSlides)
-      return newSlides
-    })
+      return newSlides;
+    });
     handleResize();
     handleScroll();
 
@@ -113,7 +115,7 @@ export default function ReactFP({
   const handleScroll = () => {
     const { resetScroll, translateY, offsetHeight, viewportHeight } = pageState;
 
-    console.info('\n\n\n handle scroll', slide, ticking, pageState)
+    console.info("\n\n\n handle scroll", slide, ticking, pageState);
     if (pageState.lockScroll) {
       // if > top and bottom < fix scroll
       window.scrollTo(0, translateY * -1);
@@ -168,12 +170,18 @@ export default function ReactFP({
   };
 
   const handleResize = () => {
-    console.info('\n\n\n handle resize', ticking, FPContainerInnerRef, ReactFPRef)
-    if (!ticking.current || !FPContainerInnerRef.current || !ReactFPRef.current) return;
+    console.info(
+      "\n\n\n handle resize",
+      ticking,
+      FPContainerInnerRef,
+      ReactFPRef
+    );
+    if (!ticking.current || !FPContainerInnerRef.current || !ReactFPRef.current)
+      return;
 
     window.requestAnimationFrame(() => {
       const fullpageHeight = FPContainerInnerRef.current!.clientHeight;
-      ticking.current = false
+      ticking.current = false;
       // update count
       setPageState({
         ...pageState,
@@ -191,30 +199,30 @@ export default function ReactFP({
   };
 
   const handleKeys = (event: KeyboardEvent) => {
-    console.info('\n\n\n handle keys', slides);
+    console.info("\n\n\n handle keys", slides);
 
     if (!keyboardShortcut) return true;
 
     const eventKey = event.code || event.keyCode;
 
     switch (event.code) {
-      case 'PageDown':
-      case 'ArrowRight':
-      case 'ArrowDown': {
+      case "PageDown":
+      case "ArrowRight":
+      case "ArrowDown": {
         event.preventDefault();
         return event.shiftKey ? last() : next();
       }
-      case 'PageUp':
-      case 'ArrowLeft':
-      case 'ArrowUp': {
+      case "PageUp":
+      case "ArrowLeft":
+      case "ArrowUp": {
         event.preventDefault();
         return event.shiftKey ? first() : back();
       }
-      case 'End': {
+      case "End": {
         event.preventDefault();
         return last();
       }
-      case 'Home': {
+      case "Home": {
         event.preventDefault();
         return first();
       }
@@ -226,13 +234,13 @@ export default function ReactFP({
   const goto = (newSlide, resetScroll = false) => {
     const { transitionTiming, fullpageHeight, viewportHeight } = pageState;
 
-    console.info('\n\n\n in goto', slide, newSlide, slide != newSlide);
+    console.info("\n\n\n in goto", slide, newSlide, slide != newSlide);
 
     // TODO(noah): this is always false
     // ^ because after move it always resets to slide 0
     // ^ i.e. only the first move works, then it gets stuck on 0 != 0
     if (slide != newSlide) {
-      console.info('\n\n\n in first check', slide, newSlide)
+      console.info("\n\n\n in first check", slide, newSlide);
       const translateY = Math.max(
         (fullpageHeight - viewportHeight) * -1,
         newSlide.current.offsetTop * -1
@@ -270,22 +278,26 @@ export default function ReactFP({
   };
 
   const back = () => {
-    const index = pageState.slideIndex >= slides.length - 1
-      ? 0
-      : pageState.slideIndex + 1
+    const index =
+      pageState.slideIndex >= slides.length - 1 ? 0 : pageState.slideIndex + 1;
 
     // console.info('\n\n\n in back', index, slides[index])
     goto(slides[index], true);
   };
 
   const next = () => {
-    const index = pageState.slideIndex < (slides.length - 1)
-      ? pageState.slideIndex + 1
-      : 0;
+    const index =
+      pageState.slideIndex < slides.length - 1 ? pageState.slideIndex + 1 : 0;
 
-    console.info('\n\n\n in next', pageState.slideIndex, index, slides[pageState.slideIndex], slides[index])
+    console.info(
+      "\n\n\n in next",
+      pageState.slideIndex,
+      index,
+      slides[pageState.slideIndex],
+      slides[index]
+    );
     if (slides[index]) goto(slides[index], true);
-    else console.error('\n\n\n cant go to slide', index, slides)
+    else console.error("\n\n\n cant go to slide", index, slides);
   };
 
   const first = () => {
@@ -302,7 +314,7 @@ export default function ReactFP({
     let listenersAdded = false;
 
     if (!listenersAdded) {
-      console.info('\n\n\n wtf adding listeners again')
+      console.info("\n\n\n wtf adding listeners again");
       listenersAdded = true;
       // handleResize()
       if (typeof window !== "undefined") {
@@ -315,7 +327,7 @@ export default function ReactFP({
     }
 
     return () => {
-      console.info('\n\n\n removing listeners')
+      console.info("\n\n\n removing listeners");
       // set body height == to 'auto'
       if (typeof window !== "undefined") {
         window.removeEventListener("scroll", handleScroll);
@@ -332,7 +344,7 @@ export default function ReactFP({
   const { translateY, pageYOffset, offsetHeight, slideIndex, resetScroll } =
     pageState;
 
-  console.info('\n\n\n wtf fullpage', {slides, slide, pageState})
+  console.info("\n\n\n wtf fullpage", { slides, slide, pageState });
 
   // TODO(noah): update the naming convention of components
   // ^this FUllpage component isnt the fullpage component
@@ -363,4 +375,4 @@ export default function ReactFP({
       </div>
     </FPContext.Provider>
   );
-}
+};
