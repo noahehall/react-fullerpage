@@ -32,14 +32,14 @@ const buildApp = async () =>
     }).then((output) => output)
   );
 
-await waitForCosmosImports().then(
-  () =>
-    buildApp()
-      .then(({ success, outputs, logs, ...buildData }) => {
-        if (success) console.info(`app built ${outputs.length} files `);
-        else for (const message of logs) console.error(message);
-      })
-      .then(() => import("./cosmos.imports.ts").catch((e) => e)) // watch imports
+await waitForCosmosImports().then(() =>
+  buildApp()
+    .then(({ success, outputs, logs, ...buildData }) => {
+      if (success) console.info(`app built ${outputs.length} files `);
+      else for (const message of logs) console.error(message);
+    })
+    .then(() => import("./cosmos.imports.ts").catch((e) => e)) // watch imports
+    .then(() => console.info(`frontend running on ${cosmosConfig.port}`))
 );
 
 const returnIndex = () => {
