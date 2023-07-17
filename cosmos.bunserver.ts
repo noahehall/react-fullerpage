@@ -29,27 +29,18 @@ const buildApp = async () =>
       entrypoints: ["./cosmos.entrypoint.tsx"],
       target: "browser",
       outdir: "build",
-    })
-      .then((output) => output)
-      .catch((e) => {
-        console.info("\n\n error in build", e);
-      })
+    }).then((output) => output)
   );
 
-await waitForCosmosImports();
-await buildApp().then((output) => {
-  if (output.success)
-    console.info(
-      `app built: ${output.success}; ${output.outputs.length} files `
-    );
-  else {
-    for (const message of output.logs) {
-      // Bun will pretty print the message object
-      console.error(message);
-    }
-    throw new Error(`build failed`);
-  }
-});
+await waitForCosmosImports().then(() =>
+  buildApp()
+    .then(({ success, outputs, logs, ...buildData }) => {
+      if (success) console.info(`app built ${outputs.length} files `);
+      else for (const message of logs) console.error(message);
+    })
+    .then(() => import("./cosmos.imports.ts").catch((e) => e)) // watch imports
+    .then(() => console.info(`frontend running on ${cosmosConfig.port}`))
+);
 
 const returnIndex = () => {
   const index = `
@@ -70,10 +61,10 @@ const returnIndex = () => {
   });
 };
 
-async function serveFromDir(config: {
+const serveFromDir = async (config: {
   directory?: string;
   path: string;
-}): Promise<Response | null> {
+}): Promise<Response | null> => {
   const filepath = path.join(config.directory || "", config.path);
 
   try {
@@ -86,7 +77,8 @@ async function serveFromDir(config: {
   } catch (err) {}
 
   return null;
-}
+};
+
 export default {
   port: cosmosConfig.rendererUrl.split(":").pop(),
   hostname: "0.0.0.0",
@@ -98,21 +90,16 @@ export default {
     else {
       const filepath = req.url.replace(cosmosConfig.rendererUrl, "");
 
-      const exactResponse = await serveFromDir({ path: filepath });
-      if (exactResponse) return exactResponse;
-
-      const buildResponse = await serveFromDir({
-        directory: BUILD_DIR,
-        path: filepath,
-      });
-      if (buildResponse) return buildResponse;
-
-      return new Response("File not found", {
-        status: 404,
-      });
+      return (
+        (await serveFromDir({ path: filepath })) ||
+        (await serveFromDir({
+          directory: BUILD_DIR,
+          path: filepath,
+        })) ||
+        new Response("File not found", {
+          status: 404,
+        })
+      );
     }
   },
 } satisfies ServeOptions;
-
-// watch imports
-await import("./cosmos.imports.ts").catch((e) => e);

@@ -63,36 +63,36 @@ export const ReactFP: FC<ReactFPInterface> = ({
   const fullscreen = useRef(false);
   const ReactFPRef = useRef<HTMLDivElement>(null);
 
-  const getIndex = (slide) => {
+  const getIndex = (slide: FPItemRef): number => {
     return slides.indexOf(slide);
   };
 
-  // set slides in lexical order
-  const subscribe = (slide) =>
+  const subscribe = (slide: FPItemRef): void =>
     setSlides((prevSlides) =>
-      [...prevSlides, slide].sort(({ current: a }, { current: b }) => {
-        const aTop = a.offsetTop;
-        const bTop = b.offsetTop;
-        return aTop - bTop;
-      })
+      // set slides in lexical order
+      [...prevSlides, slide].sort(
+        ({ current: a }, { current: b }) => a.offsetTop - b.offsetTop
+      )
     );
 
-  const unsubscribe = (slide) =>
+  const unsubscribe = (slide: FPItemRef): void =>
     setSlides((prevSlides) => prevSlides.filter((s) => s !== slide));
 
   const handle = useFullScreenHandle();
 
+  const toggleFullScreen = () => {
+    fullscreen.current
+      ? handle.exit()
+      : handle.enter().catch((e) => {
+          console.error("unable to enter fullscreen mode", e);
+        });
+
+    fullscreen.current = !fullscreen.current;
+  };
+
   return (
-    <FullScreen handle={handle}>
-      <Button
-        onClick={() => {
-          {
-            fullscreen.current ? handle.exit() : handle.enter();
-          }
-          return void (fullscreen.current = !fullscreen.current);
-        }}
-        style={useButtonStyle}
-      />
+    <FullScreen handle={handle} className={`reactfp ${className}`.trim()}>
+      <Button style={useButtonStyle} onClick={toggleFullScreen} />
       <FPContext.Provider
         value={{
           getIndex,
@@ -103,13 +103,7 @@ export const ReactFP: FC<ReactFPInterface> = ({
           unsubscribe,
         }}
       >
-        <motion.div
-          className={className}
-          layout
-          ref={ReactFPRef}
-          style={useStyle}
-          {...motionProps}
-        >
+        <motion.div layout ref={ReactFPRef} style={useStyle} {...motionProps}>
           <Suspense fallback={<Fallback />}>{children}</Suspense>
         </motion.div>
       </FPContext.Provider>
