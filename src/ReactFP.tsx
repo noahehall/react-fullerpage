@@ -91,7 +91,7 @@ export const ReactFP: FC<ReactFPInterface> = ({
   };
 
   return (
-    <FullScreen handle={handle}>
+    <FullScreen handle={handle} className={`reactfp ${className}`.trim()}>
       <Button style={useButtonStyle} onClick={toggleFullScreen} />
       <FPContext.Provider
         value={{
@@ -103,13 +103,7 @@ export const ReactFP: FC<ReactFPInterface> = ({
           unsubscribe,
         }}
       >
-        <motion.div
-          className={className}
-          layout
-          ref={ReactFPRef}
-          style={useStyle}
-          {...motionProps}
-        >
+        <motion.div layout ref={ReactFPRef} style={useStyle} {...motionProps}>
           <Suspense fallback={<Fallback />}>{children}</Suspense>
         </motion.div>
       </FPContext.Provider>

@@ -5,7 +5,6 @@ import {
   type ReactNode,
   useContext,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -29,7 +28,6 @@ export interface FPContainerInterface {
   motionProps?: MotionProps;
   onChange?: (state: object, prevIndex: number, nextIndex: number) => void;
   outerStyle?: CSSProperties;
-  scrollDebounceMs?: number;
   style?: CSSProperties;
   transitionTiming?: number;
 }
@@ -41,29 +39,15 @@ export const FPContainer: FC<FPContainerInterface> = ({
   motionProps = {},
   onChange,
   outerStyle = {},
-  scrollDebounceMs = 125,
   style = {},
   transitionTiming = 0.5,
 }) => {
-  const FPContainerInnerRef = useRef<HTMLDivElement>(null);
   const { scrollY } = useScroll();
   const throttled = useRef<boolean>(false);
-  const ticking = useRef<boolean>(false);
-
-  const useOuterStyle = useMemo(
-    () => ({
-      left: 0,
-      position: "fixed" as const,
-      right: 0,
-      top: 0,
-      ...outerStyle,
-    }),
-    [outerStyle]
-  );
 
   const useStyle = useMemo(
     () => ({
-      position: "absolute" as const,
+      position: "relative" as const,
       left: 0,
       right: 0,
       ...style,
@@ -71,164 +55,85 @@ export const FPContainer: FC<FPContainerInterface> = ({
     [style]
   );
 
-  const { ReactFPRef, slides, isFullscreen } = useContext(FPContext);
+  const { slides, isFullscreen } = useContext(FPContext);
 
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
 
   const [pageState, setPageState] = useState({
-    fullpageHeight: 0,
-    offsetHeight: 0,
-    resetScroll: false,
     slideIndex: 0,
     translateY: 0,
-    viewportHeight: 0,
   });
 
-  const goto = useCallback(
-    (slideIndex: number, resetScroll = false) => {
-      if (!slides[slideIndex] || pageState.slideIndex === slideIndex) return;
+  const goto = (slideIndex: number) => {
+    if (pageState.slideIndex === slideIndex || !slides[slideIndex]) return;
+    throttled.current = true;
 
-      const { fullpageHeight, viewportHeight } = pageState;
+    const newSlide = slides[slideIndex];
 
-      const newSlide = slides[slideIndex];
+    const translateY = slideIndex === 0 ? 0 : newSlide.current.offsetTop;
+    if (translateY === pageState.translateY) return;
 
-      const translateY = Math.max(
-        (fullpageHeight - viewportHeight) * -1,
-        newSlide.current.offsetTop * -1
-      );
+    console.info("\n\n\n scrolling to", slideIndex, translateY);
 
-      throttled.current = true;
+    const newPageState = {
+      slideIndex,
+      translateY,
+    };
 
-      const newPageState = {
-        offsetHeight: newSlide.current.offsetHeight,
-        resetScroll,
-        slideIndex,
-        translateY,
-      };
+    startTransition(() => {
+      setPageState((prevState) => ({ ...prevState, ...newPageState }));
+    });
 
-      startTransition(() => {
-        setPageState((prevState) => ({ ...prevState, ...newPageState }));
-      });
+    setTimeout(() => {
+      throttled.current = false;
+    }, transitionTiming * 2000);
 
-      setTimeout(() => {
-        throttled.current = false;
-      }, transitionTiming * 1000);
+    if (typeof onChange === "function")
+      onChange(newPageState, pageState.slideIndex, slideIndex);
+  };
 
-      if (typeof onChange === "function")
-        onChange(newPageState, pageState.slideIndex, slideIndex);
-    },
-    [onChange, transitionTiming, pageState, slides]
-  );
+  const last = () => {
+    goto(slides.length - 1);
+  };
 
-  const last = useCallback(() => {
-    if (slides.length <= 1) return;
-
-    goto(slides.length - 1, true);
-  }, [slides, goto]);
-
-  const back = useCallback(() => {
-    if (slides.length <= 1) return;
-
+  const back = () => {
     switch (pageState.slideIndex) {
       case 0:
         return last();
       default:
-        return goto(pageState.slideIndex - 1, true);
+        return goto(pageState.slideIndex - 1);
     }
-  }, [goto, last, pageState.slideIndex, slides.length]);
+  };
 
-  const first = useCallback(() => {
-    if (slides.length <= 1) return;
+  const first = () => {
+    goto(0);
+  };
 
-    goto(0, true);
-  }, [slides.length, goto]);
-
-  const forward = useCallback(() => {
-    if (slides.length <= 1) return;
-
+  const forward = () => {
     switch (pageState.slideIndex) {
       case slides.length - 1:
         return first();
       default:
-        return goto(pageState.slideIndex + 1, true);
+        return goto(pageState.slideIndex + 1);
     }
-  }, [slides.length, pageState.slideIndex, first, goto]);
+  };
 
   useMotionValueEvent(scrollY, "change", (latest) => {
-    if (throttled.current) return;
+    console.info("\n\n\n throttled check", throttled.current);
+    if (throttled.current || isPending) return;
     throttled.current = true;
 
-    if (!ticking.current) {
-      window.requestAnimationFrame(() => {
-        const newScrollY = latest;
-        const prevScrollY = scrollY.prev;
+    const newScrollY = latest;
+    const prevScrollY = scrollY.prev;
 
-        if (newScrollY === 0) first();
-        else if (
-          window.innerHeight + Math.round(newScrollY) >=
-          document.body.offsetHeight
-        )
-          last();
-        else if (prevScrollY < newScrollY) forward();
-        else if (prevScrollY > newScrollY) back();
-
-        if (pageState.resetScroll)
-          startTransition(() => {
-            setPageState((prevState) => ({
-              ...prevState,
-              resetScroll: false,
-            }));
-          });
-
-        ticking.current = false;
-      });
-      ticking.current = true;
-    }
-
-    setTimeout(() => {
-      throttled.current = false;
-    }, transitionTiming * 1000);
+    if (newScrollY === 0) first();
+    else if (prevScrollY < newScrollY) forward();
+    else if (prevScrollY > newScrollY) back();
   });
-
-  const handleResize = useCallback(() => {
-    if (!FPContainerInnerRef.current) return;
-
-    const curHeight = Math.max(
-      document.documentElement.clientHeight,
-      window.innerHeight
-    );
-
-    // shortcircuit
-    if (
-      pageState.fullpageHeight === FPContainerInnerRef.current!.clientHeight &&
-      pageState.viewportHeight === curHeight
-    )
-      return;
-
-    if (!ticking.current) {
-      requestAnimationFrame(() => {
-        const fullpageHeight = FPContainerInnerRef.current!.clientHeight;
-
-        startTransition(() => {
-          setPageState((prevState) => ({
-            ...prevState,
-            fullpageHeight,
-            viewportHeight: Math.max(
-              document.documentElement.clientHeight,
-              window.innerHeight
-            ),
-          }));
-        });
-        ReactFPRef.current!.style.height = `${fullpageHeight}px`;
-        ticking.current = false;
-      });
-      ticking.current = true;
-    }
-  }, [ReactFPRef, ticking, pageState.fullpageHeight, pageState.viewportHeight]);
 
   const handleKeys = (event: KeyboardEvent<Element>) => {
     if (!keyboardShortcut) return;
-
+    console.info("\n\n in handle keys");
     switch (event.code) {
       case "PageDown":
       case "ArrowRight":
@@ -254,35 +159,28 @@ export const FPContainer: FC<FPContainerInterface> = ({
   };
 
   useEffect(() => {
-    window.addEventListener("resize", handleResize, { passive: true });
     document.addEventListener("keydown", handleKeys, { passive: true });
 
     return () => {
-      window.removeEventListener("resize", handleResize);
       document.removeEventListener("keydown", handleKeys);
     };
   });
 
-  useLayoutEffect(() => {
-    handleResize();
-  }, [isFullscreen, handleResize]);
-
+  console.info("\n\n\n new page state", pageState);
   return (
-    <div style={useOuterStyle}>
-      <motion.div
-        className={className}
-        ref={FPContainerInnerRef}
-        style={useStyle}
-        animate={{ y: pageState.translateY }}
-        transition={{
-          ease: [0.17, 0.67, 0.83, 0.67],
-          duration: transitionTiming,
-        }}
-        layout
-        {...motionProps}
-      >
-        {children}
-      </motion.div>
-    </div>
+    <motion.div
+      id="wtf"
+      className={className}
+      style={useStyle}
+      animate={{ y: pageState.translateY }}
+      // transition={{
+      //   ease: [0.17, 0.67, 0.83, 0.67],
+      //   duration: transitionTiming,
+      // }}
+      layout
+      {...motionProps}
+    >
+      {children}
+    </motion.div>
   );
 };

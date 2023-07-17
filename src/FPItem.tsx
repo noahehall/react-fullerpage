@@ -30,9 +30,10 @@ export const FPItem: FC<FPItemInterface> = ({
   const useStyle = useMemo(
     () => ({
       height,
+      position: "relative" as const,
       ...style,
     }),
-    [style]
+    [style, height]
   );
 
   const { subscribe, unsubscribe } = useContext(FPContext);
@@ -44,7 +45,7 @@ export const FPItem: FC<FPItemInterface> = ({
     return () => {
       unsubscribe(FPItemRef);
     };
-  }, []);
+  }, [subscribe, unsubscribe]);
 
   return (
     <motion.div
